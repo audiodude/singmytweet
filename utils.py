@@ -9,7 +9,7 @@ import urllib2
 from secrets import *
 
 DATABASE = 'followers.db'
-TWITTER_HANDLE = 'owenphen' #'singthattweet'
+TWITTER_HANDLE ='singthattweet'
 
 STREAM_URL = "https://userstream.twitter.com/2/user.json"
 
@@ -29,6 +29,7 @@ def stream(stream_url=STREAM_URL):
         'oauth_timestamp': str(int(time.time())),
         'oauth_nonce': _generate_nonce(),
         'oauth_version': '1.0',
+        'track': TWITTER_HANDLE
     }
 
     oauth_request = oauth.Request.from_token_and_callback(access_token,
@@ -65,13 +66,18 @@ def stream(stream_url=STREAM_URL):
             yield tweets[0]
             buffer = tweets[1]
 
-
-def oauth_req(url, params={}, http_method="GET"):
-    consumer = oauth.Consumer(key=CONSUMER_KEY, secret=CONSUMER_SECRET)
-    token = oauth.Token(key=ACCESS_TOKEN, secret=ACCESS_SECRET)
+def oauth_req(url, params={}, http_method="GET", consumer_key=CONSUMER_KEY, 
+              consumer_secret=CONSUMER_SECRET, access_token=ACCESS_TOKEN, 
+              access_secret=ACCESS_SECRET):
+    consumer = oauth.Consumer(key=consumer_key, secret=consumer_secret)
+    token = oauth.Token(key=access_token, secret=access_secret)
     client = oauth.Client(consumer, token=token)
-
-    request = client.request(url, body=urllib.urlencode(params))
+    
+    body=urllib.urlencode(params)
+    
+    print url
+    print body
+    request = client.request(url, method=http_method, body=body)
     #this is a tuple of a response header and the response we care about
     return request
 
