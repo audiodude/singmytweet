@@ -1,61 +1,65 @@
-import oauth2 as oauth
 import json
 import logging
-import sqlite3
 import time
 
-CONSUMER_KEY = 'ixi9mvjKiq26fxGuAWfn6Q'
-CONSUMER_SECRET = 'IXhg2h77QqZPNzqct2wgoDQYKypRIEsB9eNvyy5UsA'
-
-ACCESS_TOKEN = '17712723-xcKmCtA4BxBEPL4ZOm9ld6UGs0y8jEJwbP8PXYhjg'
-ACCESS_SECRET = 'yKUidByMLI1H570ZnEQFN3gSPs4jVib6benpeXlwR4'
-
-DATABASE = 'followers.db'
-TWITTER_HANDLE = 'owenphen' #'singthattweet'
+from utils import oauth_req
+from utils import get_conn
+from utils import TWITTER_HANDLE
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
 
-def oauth_req(url, params={}, http_method="GET"):
-    consumer = oauth.Consumer(key=CONSUMER_KEY, secret=CONSUMER_SECRET)
-    token = oauth.Token(key=ACCESS_TOKEN, secret=ACCESS_SECRET)
-    client = oauth.Client(consumer, token=token)
+def get_user_info(handle_ids):
+    url = 'https://api.twitter.com/1.1/users/lookup.json?user_id=%s'
 
-    request = client.request(url, headers=params)
-    #this is a tuple of a response header and the response we care about
-    return request
+    handle_ids = ','.join([str(x) for x in handle_ids])
+    print '%r' % handle_ids
+    print type(handle_ids)
 
-def get_user_info(handle_id):
-    url = 'https://api.twitter.com/1.1/users/lookup.json?user_id=%s' % handle_id
-    print url
-    info, response = oauth_req(url)
+    params = {}
+    url = url % handle_ids
+    info, response = oauth_req(url, params)
     
     if info['status'] != '200':   
         logger.error(info)
         logger.error(response)
         logger.error('get a %s error trying to get user info for %s',
-                     info['status'], handle_id)
-        return []
+                     info['status'], handle_ids)
+        return
 
-    users = []
-    peoples = json.loads(response)
-    for peep in peoples:
-        screen_name = peep.get('screen_name')
-        users.append(screen_name)
-    return users
+    print response
+    people = json.loads(response)
+    for peep in people:
+        id = peep.get('id')
+        name = peep.get('screen_name')
+        yield name, id
+
+def create_tweet(tweet):
+    url = 'http://api.twitter.com/1.1/statuses/update.json'
+    params = {
+        'status': tweet
+    }
+    info, response = oauth_req(url, params, 'POST')
+    
+    if info['status'] != '200':   
+        logger.error(info)
+        logger.error(response)
+        logger.error('get a %s error trying to tweet %r',
+                     info['status'], tweet)
+        
 
 
 def get_followers(handle_name):
-    url = 'https://api.twitter.com/1.1/followers/ids.json&screen_name=%s&cursor=%s'
+    url = 'https://api.twitter.com/1.1/followers/ids.json'
     cursor = -1
     users = []
     ids = True  
 
-    while ids:
+    while cursor:
         params = {'screen_name': handle_name, 'cursor': str(cursor)}
-        get_url = url % (handle_name, str(cursor))
-        info, response = oauth_req(get_url, {})
-        
+        #get_url = url + '&screen_name=%s&cursor=%s' % (handle_name, str(cursor))
+
+        info, response = oauth_req(url, params)
+
         if info['status'] != '200':   
             logger.error(info)
             logger.error(response)
@@ -66,11 +70,7 @@ def get_followers(handle_name):
         loaded = json.loads(response)
         ids = loaded.get('ids')
         users.extend(ids)
-        cursor += 1
-
-        print loaded
-        print params
-        time.sleep(1)
+        cursor = info.get('next_cursor_str')
 
     return users
 
@@ -90,7 +90,7 @@ def follow_id(handle_id):
     return True
 
 def create_sql_tables():
-    conn = sqlite3.connect(DATABASE)
+    conn = get_conn()
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS
                 followers
@@ -98,36 +98,46 @@ def create_sql_tables():
 
 def store_followers(followers):
     #followers is a tuple list of handle_names, handle_ids
-    conn = sqlite3.connect(DATABASE)
+    conn = get_conn()
     c = conn.cursor()
     c.executemany("INSERT INTO followers VALUES (?, ?)", followers)
 
 def update_follower_db(all_followers):
-    conn = sqlite3.connect(DATABASE)
+    conn = get_conn()
+    new = []
     c = conn.cursor()
     for handle_id in all_followers:
         c.execute("""SELECT handle_name, handle_id
                      FROM followers 
                      WHERE handle_id = ?
-                  """, handle_id)
+                  """, (handle_id, ))
         results = c.fetchone()
         if results:
             continue
         else:
-            yield get_
+            new.append(handle_id)
 
-
+    return get_user_info(new)
 
 def follow_new(new_followers):
     for _, handle_id in new_followers:
         follow_id(handle_id)
 
-def main():
+def main(username=TWITTER_HANDLE):
     create_sql_tables()
-    all_followers = get_followers(TWITTER_HANDLE)
-    new_followers = update_follower_db(all_followers)
-    follow_new(new_followers)
+    while True:
+        try:
+            all_followers = get_followers(username)
+            new_followers = update_follower_db(all_followers)
+            new_followers = list(new_followers)
+            store_followers(new_followers)
+            follow_new(new_followers)
 
+        except Exception, e:
+            logger.error("caught excepion, %r", e)
+        
+        time.sleep(60)
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
     main()
