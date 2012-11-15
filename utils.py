@@ -5,6 +5,7 @@ import time
 import md5
 import random
 import urllib2
+from contextlib import contextmanager
 
 from secrets import *
 
@@ -63,7 +64,8 @@ def stream(stream_url=STREAM_URL):
 
         tweets = buffer.split("\n", 1)
         if len(tweets) > 1:
-            yield tweets[0]
+            if tweets[0] != '\r':
+                yield tweets[0]
             buffer = tweets[1]
 
 def oauth_req(url, params={}, http_method="GET", consumer_key=CONSUMER_KEY, 
@@ -75,11 +77,19 @@ def oauth_req(url, params={}, http_method="GET", consumer_key=CONSUMER_KEY,
     
     body=urllib.urlencode(params)
     
-    print url
-    print body
     request = client.request(url, method=http_method, body=body)
     #this is a tuple of a response header and the response we care about
     return request
 
-def get_conn():
-    return sqlite3.connect(DATABASE)
+@contextmanager
+def follower_cursor():
+
+    try:
+        conn = sqlite3.connect(DATABASE)
+        cur = conn.cursor()
+        yield cur
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()

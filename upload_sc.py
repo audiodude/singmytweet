@@ -4,7 +4,7 @@ from utils import oauth_req
 
 code = '1b2ce8bafaac48b2e2b21a6ab0681e49'
 
-def upload(filename, title):
+def upload(filename, title, description):
     # create client object with app credentials
 
     oauth_req
@@ -13,6 +13,7 @@ def upload(filename, title):
 
     track = client.post('/tracks', track={
         'title': title,
+        'description': description,
         'sharing': 'public',
         'asset_data': open(filename, 'rb')
     })

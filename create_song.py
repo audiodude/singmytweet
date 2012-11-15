@@ -28,9 +28,14 @@ def nsyl(word):
     else:
         return 3
 
+def clean_tweet(text):
+    return text.replace('@SingThatTweet', '')
+
 def text_to_song_file(tweet_text, tweet_id=None):
     if tweet_id is None:
         tweet_id = time.time()
+
+    tweet_text = clean_tweet(tweet_text)
 
     words = BREAK.findall(tweet_text)
     print words
@@ -66,7 +71,3 @@ def text_to_song_file(tweet_text, tweet_id=None):
         subprocess.call(['/home/tweetsong/festival/bin/text2wave', '-mode', 'singing', xml_file.name, '-o', outfile_name])
 
     return outfile_name
-
-#text_to_song_file('Test this thing please')
-#text_to_song_file('sing thing tweet please dont screw this up')
-#text_to_song_file('singthingtweet please dont screw this up')

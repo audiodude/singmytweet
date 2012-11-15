@@ -1,3 +1,4 @@
+import os
 import logging
 import time
 from secrets import *
@@ -9,7 +10,6 @@ import upload_sc
 import datetime
 
 from utils import stream, TWITTER_HANDLE
-#from utils import get_conn
 from follow_back import create_tweet
 
 logger = logging.getLogger(__name__)
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 PROCESS_NUM = 5
 
 def tweet_song(username, title, url):
-    tweet_text = '@%s I sang your song! %s' % (username, url)
+    tweet_text = '@%s I sang that tweet, check it out: %s' % (username, url)
     create_tweet(tweet_text)
 
 class SingTweetProcess(multiprocessing.Process):
@@ -32,12 +32,18 @@ class SingTweetProcess(multiprocessing.Process):
         
         song_file = text_to_song_file(text, tweet_id)
         #song_file = '/tmp/test.wav'
-        dt = datetime.datetime.now().strftime('%M-%d-%Y')
-        title = '%s - %s - %s' % (username, dt, tweet_id)
-        song_url = upload_sc.upload(song_file, title)
+
+        dt = datetime.datetime.now().strftime('%a %b %d %l %p')
+        title = '%s\'s tweet, %s' % (username, dt)
+        description = '@%s tweeted &quot;%s&quot;, and @SingThatTweet sang it' % (username, text)
+
+        song_url = upload_sc.upload(song_file, title, description)
         tweet_song(username, title, song_url)
 
     def run(self):
+        with open('analyze_stream.pid', 'a') as pidfile:
+            pidfile.write('%s\n' % self.pid)
+
         items = 0
         while True:
             items += 1
@@ -59,10 +65,13 @@ def check_stream():
         processes.append(process)
 
     for i in stream():
+        logger.debug('Got new data:\n%r', i)
         try:
             tweet = json.loads(i)
             username = tweet.get('user', {}).get('screen_name', None)
-            if username.lower() == TWITTER_HANDLE:
+            if username is None:
+                continue
+            elif username.lower() == TWITTER_HANDLE:
                 #skip my own shit
                 continue
             else:
@@ -80,6 +89,10 @@ def check_stream():
     queue.join()
 
 def main():
+    try:
+        os.remove('analyze_stream.pid')
+    except IOError:
+        pass
     check_stream()
     
 if __name__ == "__main__":
