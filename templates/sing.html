@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Auto singer - sing any text</title>
+</head>
+<body>
+  {% if song %}
+  <audio controls="controls">
+    <source src="{{ song }}"/>
+  </audio>
+  {% else %}
+  <form method="POST">
+    <div>Type your text and it will be automatically sung:<input name="text"/><input type="submit"/></div>
+  </form>
+  {% endif %}
+</body>

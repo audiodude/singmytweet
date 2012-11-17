@@ -3,3 +3,4 @@
 supervisord.log
 supervisord.pid
 analyze_stream.pid
+static
