@@ -1,3 +1,5 @@
 oauth2
 requests
 soundcloud
+flask
+gunicorn
