@@ -2,6 +2,7 @@ import re
 import tempfile
 import time
 import subprocess
+import random
 
 import curses
 from curses.ascii import isdigit
@@ -31,7 +32,7 @@ def nsyl(word):
 def clean_tweet(text):
     return text.replace('@SingThatTweet', '')
 
-def text_to_song_file(tweet_text, tweet_id=None):
+def text_to_song_file(tweet_text, tweet_id=None, song_name=None):
     if tweet_id is None:
         tweet_id = time.time()
 
@@ -41,8 +42,9 @@ def text_to_song_file(tweet_text, tweet_id=None):
     print words
     words_syls = [(word, nsyl(word)) for word in words if word]
 
-    # TODO randomize this, or decide on a beatmap based on the phrasing (would be nice)
-    beatmap = BEATMAPS[0]
+    beatmap = BEATMAPS.get(song_name)
+    if beatmap is None:
+        beatmap = random.choice(BEATMAPS.values())
 
     with tempfile.NamedTemporaryFile() as xml_file:
         xml_file.write(XML_HEADER)
@@ -51,15 +53,15 @@ def text_to_song_file(tweet_text, tweet_id=None):
             durs = []
             notes = []
             for _ in range(syl):
-                next_bm = bm_iter.next()
-                if next_bm is None:
-                    # TODO handle the case where we are out of notes
+                try:
+                    next_bm = bm_iter.next()
+                except StopIteration as e:
                     break
                 durs.append(next_bm[0])
                 notes.append(next_bm[1])
-
-            cleaned_word = word.replace('@', '').replace('#', '')
-            xml_file.write('<DURATION BEATS="%s"><PITCH NOTE="%s">%s</PITCH></DURATION>\n' %
+            else:
+                cleaned_word = word.replace('@', '').replace('#', '')
+                xml_file.write('<DURATION BEATS="%s"><PITCH NOTE="%s">%s</PITCH></DURATION>\n' %
                            (','.join([str(x) for x in durs]), ','.join(notes), cleaned_word))
         xml_file.write(XML_FOOTER)
         xml_file.flush()
