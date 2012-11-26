@@ -13,12 +13,18 @@ SLEEP_TIME = INIT_SLEEP_TIME
 def get_user_info(handle_ids):
     url = 'https://api.twitter.com/1.1/users/lookup.json?user_id=%s'
 
+    orig_handle_ids = handle_ids
     handle_ids = ','.join([str(x) for x in handle_ids])
     params = {}
     url = url % handle_ids
     info, response = oauth_req(url, params)
 
-    if info['status'] != '200':   
+    if info['status'] == '404':
+        # 404 for suspended accounts
+        for id_ in orig_handle_ids:
+            yield 'SUSPENDED', id_
+        return
+    elif info['status'] != '200':   
         logger.error(info)
         logger.error(response)
         logger.error('get a %s error trying to get user info for %s',
@@ -64,8 +70,6 @@ def get_followers(handle_name):
 
     while cursor:
         params = {'screen_name': handle_name, 'cursor': str(cursor)}
-        #get_url = url + '&screen_name=%s&cursor=%s' % (handle_name, str(cursor))
-
         info, response = oauth_req(url, params)
 
         if info['status'] == '429':
@@ -94,13 +98,14 @@ def follow_id(handle_id):
     url = 'https://api.twitter.com/1.1/friendships/create.json'
     params = {'user_id': str(handle_id), 'follow': True}
 
+    logger.debug('Following user_id: %s', handle_id)
     info, response = oauth_req(url, params, 'POST')
-        
+
     if info['status'] != '200':   
-        logger.error(info)
-        logger.error(response)
         logger.error('get a %s error trying to follow %s',
                      info['status'], handle_id)
+        logger.error(info)
+        logger.error(response)
         return False
 
     return True
@@ -118,7 +123,7 @@ def store_followers(followers):
     else:
         logger.debug('No new followers to insert into db')
     with follower_cursor() as cur:
-        cur.executemany("INSERT INTO followers VALUES (?, ?)", followers)
+        cur.executemany("INSERT INTO followers (`handle_name`, `handle_id`) VALUES (?, ?)", followers)
 
 def update_follower_db(all_followers):
     new = []

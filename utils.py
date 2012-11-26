@@ -5,7 +5,7 @@ import time
 import md5
 import random
 import urllib2
-from contextlib import contextmanager
+from contextlib import contextmanager, closing
 
 from secrets import *
 
@@ -74,22 +74,19 @@ def oauth_req(url, params={}, http_method="GET", consumer_key=CONSUMER_KEY,
     consumer = oauth.Consumer(key=consumer_key, secret=consumer_secret)
     token = oauth.Token(key=access_token, secret=access_secret)
     client = oauth.Client(consumer, token=token)
-    
+
     body=urllib.urlencode(params)
-    
-    request = client.request(url, method=http_method, body=body)
+    if http_method == "GET":
+        request = client.request(url + '?' + body, method=http_method)
+    elif http_method == "POST":
+        request = client.request(url, method=http_method, body=body)
+
     #this is a tuple of a response header and the response we care about
     return request
 
 @contextmanager
 def follower_cursor():
-
-    try:
-        conn = sqlite3.connect(DATABASE)
-        cur = conn.cursor()
-        yield cur
-    finally:
-        if cur:
-            cur.close()
-        if conn:
-            conn.close()
+    with closing(sqlite3.connect(DATABASE)) as conn:
+        with closing(conn.cursor()) as cur:
+            yield cur
+        conn.commit()
